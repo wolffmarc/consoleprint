@@ -632,9 +632,19 @@ class ConsolePrinter:
 		self._length = 80  # line length
 		self._width_label = 10  # width of the line prefix label field
 		self._width_status = 8  # width of the line suffix status field
-		self._color_label = {'info': 'blue', 'warning': 'yellow', 'error': 'red'}  # label colors
-		self._color_status_fg = {'ok': 'black', 'failed': 'white'}  # status foreground colors
-		self._color_status_bg = {'ok': 'green', 'failed': 'red'}  # status background colors
+		# Label colors
+		self._color_label_default = {
+			'info': {'fg': 'blue', 'bg': None},
+			'warning': {'fg': 'yellow', 'bg': None},
+			'error': {'fg': 'red', 'bg': None}
+		}
+		self._color_label = copy.deepcopy(self._color_label_default)
+		# Status colors
+		self._color_status_default = {
+			'ok': {'fg': None, 'bg': 'green'},
+			'failed': {'fg': None, 'bg': 'red'}
+		}
+		self._color_status = copy.deepcopy(self._color_status_default)
 		if not isinstance(line_length, int):
 			raise TypeError('integer value expected for line length')
 		min_valid_line_length = 2 * (self._width_label + self._width_status)
@@ -664,27 +674,28 @@ class ConsolePrinter:
 		:param label: optional, should be 'info, 'warning' or 'error'
 		:param status: optional, should be 'ok' or 'failed'
 		"""
-		# Parse label
+		# Create label string for display
 		if label is None:
 			label_display = ' ' * self._width_label
 		else:
 			label = label.lower().strip()
 			if label not in ['info', 'warning', 'error']:
 				raise ValueError('invalid label, should be \'info\', \'warning\' or \'error\'')
+			fg = self._color_label[label]['fg']
+			bg = self._color_label[label]['bg']
 			label_display = '[' + label.upper().center(self._width_label - 2) + ']'
-			label_display = RichText(label_display, fg=self._color_label[label], style='bold')
-		# Parse status
+			label_display = RichText(label_display, fg=fg, bg=bg, style='bold')
+		# Create status string for display
 		if status is None:
 			status_display = ''
 		else:
 			status = status.lower().strip()
 			if status not in ['ok', 'failed']:
 				raise ValueError('invalid label, should be \'ok\' or \'failed\'')
+			fg = self._color_status[status]['fg']
+			bg = self._color_status[status]['bg']
 			status_display = '[' + status.upper().center(self._width_status - 2) + ']'
-			status_display = RichText(status_display,
-						  fg=self._color_status_fg[status],
-						  bg=self._color_status_bg[status],
-						  style='bold')
+			status_display = RichText(status_display, fg=fg, bg=bg, style='bold')
 		# Create the printed message
 		out = label_display + ' ' + self._create_alinea() + msg.strip()
 		# Append status
@@ -698,6 +709,23 @@ class ConsolePrinter:
 			if len(out) != self._length:
 				raise Warning('unexpected string length')
 		print(out)
+
+	def _validate_label(self, label):
+		valid_values = list(self._color_label.keys())
+		if label not in valid_values:
+			raise ValueError('label type should be one the following: ' + ', '.join(valid_values))
+
+	def _validate_status(self, status):
+		valid_values = list(self._color_status.keys())
+		if status not in valid_values:
+			raise ValueError('status type should be one the following: ' + ', '.join(valid_values))
+
+	def _validate_color(self, color):
+		error_msg = 'color is expected as a dictionary with \'fg\' and \'bg\' keys'
+		if not isinstance(color, dict):
+			raise TypeError(error_msg)
+		if sorted(list(color.keys())) != ['fg', 'bg']:
+			raise ValueError(error_msg)
 
 	def alinea_incr(self):
 		"""
@@ -733,6 +761,15 @@ class ConsolePrinter:
 			line2 = line2.ljust(self._length, '*')
 		print(RichText('\n' + line1 + '\n' + line2 + '\n', style='bold'))
 
+	def print(self, msg, label=None, status=None):
+		"""
+		Print any message
+		:param msg: message to print
+		:param label: optional label
+		:param status: optional status
+		"""
+		self._print_msg(msg, label, status)
+
 	def info(self, msg):
 		"""
 		Print info message
@@ -760,3 +797,18 @@ class ConsolePrinter:
 		:param msg: message to print
 		"""
 		self._print_msg(msg, status='failed')
+
+	def set_label_color(self, label_type, color):
+		self._validate_label(label_type)
+		self._color_label[label_type] = color
+		return self
+
+	def set_status_color(self, status_type, color):
+		self._validate_status(status_type)
+		self._color_status[status_type] = color
+		return self
+
+	def reset_colors(self):
+		self._color_label = copy.deepcopy(self._color_label_default)
+		self._color_status = copy.deepcopy(self._color_status_default)
+		return self
