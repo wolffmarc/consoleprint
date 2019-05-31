@@ -1,4 +1,7 @@
-from ConsolePrinter import ConsolePrinter
+import sys
+sys.path.append('../')
+
+from consoleprint import ConsolePrinter
 
 p = ConsolePrinter(60)
 p.header('THIS IS A TITLE')

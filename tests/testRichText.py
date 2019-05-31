@@ -1,5 +1,7 @@
 import copy
-from RichText import RichText
+import sys
+sys.path.append('./')
+from consoleprint import RichText
 
 red = RichText('red', fg='red')
 blue = RichText('blue', fg='blue')

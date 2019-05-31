@@ -478,14 +478,16 @@ class RichText:
 		string = self.str()
 		num_iter = 0
 		is_finished = False
+		idx_start_find = 0
 		while not is_finished:
 			# Look for the next occurrence of the 'old' string
-			idx = string.find(old)
+			idx = string.find(old, idx_start_find)
 			if idx != -1:
 				# If we found an occurrence, get the 'old' string's interval in the current object
 				old_interval = [idx, idx + len(old) - 1]
 				# Do the replacement
 				string = string[0:idx] + new + string[idx+len(old):]
+				idx_start_find = idx + len(new)
 				# Update style boxes
 				for sbox in self.__sbox__:
 					# Compute the overlap between the old string and the style box
@@ -500,8 +502,8 @@ class RichText:
 						sbox.length -= overlap
 				# Remove style boxes that may be empty
 				# To do so, we have to get the indices of empty style boxes and remove them in **reversed** order
-				empty_sbox = list(i for i in range(len(self.__sbox__)) if self.__sbox__[i].length == 0)
-				for i in reversed(empty_sbox):
+				idx_empty_sbox = list(i for i in range(len(self.__sbox__)) if self.__sbox__[i].length == 0)
+				for i in reversed(idx_empty_sbox):
 					del self.__sbox__[i]
 				# Update number of iterations
 				num_iter += 1
@@ -679,8 +681,7 @@ class ConsolePrinter:
 			label_display = ' ' * self._width_label
 		else:
 			label = label.lower().strip()
-			if label not in ['info', 'warning', 'error']:
-				raise ValueError('invalid label, should be \'info\', \'warning\' or \'error\'')
+			self._validate_label(label)
 			fg = self._color_label[label]['fg']
 			bg = self._color_label[label]['bg']
 			label_display = '[' + label.upper().center(self._width_label - 2) + ']'
@@ -690,8 +691,7 @@ class ConsolePrinter:
 			status_display = ''
 		else:
 			status = status.lower().strip()
-			if status not in ['ok', 'failed']:
-				raise ValueError('invalid label, should be \'ok\' or \'failed\'')
+			self._validate_status(status)
 			fg = self._color_status[status]['fg']
 			bg = self._color_status[status]['bg']
 			status_display = '[' + status.upper().center(self._width_status - 2) + ']'
@@ -721,10 +721,10 @@ class ConsolePrinter:
 			raise ValueError('status type should be one the following: ' + ', '.join(valid_values))
 
 	def _validate_color(self, color):
-		error_msg = 'color is expected as a dictionary with \'fg\' and \'bg\' keys'
+		error_msg = 'color is expected as a dictionary with \'fg\' and \'bg\' keys (foreground and background colors)'
 		if not isinstance(color, dict):
 			raise TypeError(error_msg)
-		if sorted(list(color.keys())) != ['fg', 'bg']:
+		if sorted(list(color.keys())) != ['bg', 'fg']:
 			raise ValueError(error_msg)
 
 	def alinea_incr(self):
