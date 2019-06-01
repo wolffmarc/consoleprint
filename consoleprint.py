@@ -3,6 +3,7 @@
 
 import copy
 import math
+import warnings
 try:
 	import colors
 	__flag_use_colors__ = True
@@ -26,7 +27,7 @@ def __overlap__(a, b):
 		raise Exception('first input argument is not an interval')
 	if not isinstance(b, list) or len(b) != 2 or b[0] > b[1]:
 		raise Exception('second input argument is not an interval')
-	return max(min(a[1], b[1]) - max(a[0], b[0]) + 1, 0)  #sum(1 for x in range(a[0], a[1]+1) if x in range(b[0], b[1]+1))
+	return max(min(a[1], b[1]) - max(a[0], b[0]) + 1, 0)
 
 
 class StyleBox:
@@ -47,6 +48,14 @@ class StyleBox:
 	def __str__(self):
 		return 'start=' + str(self.start) + ' length=' + str(self.length) + \
 			' fg=' + str(self.fg()) + ' bg=' + str(self.bg()) + ' style=' + str(self.style())
+
+	def contains(self, index):
+		"""
+		Indicate if the style box contains the input index
+		:param index: integer
+		:return: True if if contains the index, False otherwise
+		"""
+		return __overlap__([index, index], self.interval()) == 1
 
 	def fg(self):
 		""" Getter for the foreground color """
@@ -343,11 +352,16 @@ class RichText:
 		return self
 
 	def casefold(self):
+		"""
+		Extension of the built-in string casefold() method
+		:return: self modified
+		"""
 		try:
 			self.replaceall(self.str().casefold())
 		except:
-			# The casefold() method does not exist in Python 2, which will create errors
-			# Try calling lower() as a replacement
+			# The casefold() method does not exist in Python 2
+			# As a replacement method, try calling lower()
+			warnings.warn('failed calling casefold(), using lower() instead', Warning)
 			self.lower()			
 		return self
 
@@ -376,7 +390,33 @@ class RichText:
 		return self
 
 	def expandtabs(self, tabsize=8):
-		raise Exception('not implemented yet')  # TODO
+		"""
+		Extension of the built-in string expandtabs method
+		:param tabsize: number of spaces characters used to replace a single tab character
+		:return: self modified
+		"""
+		# Do a dummy call to the built-in method to validate input arguments
+		_ = self.str().expandtabs(tabsize)
+		# Find tab characters
+		is_finished = False
+		while not is_finished:
+			tabidx = self.str().find('\t')
+			is_finished = tabidx == -1
+			if not is_finished:
+				# Actually expand the current tab
+				self.__text__ = self.str()[:tabidx] + (' ' * tabsize) + self.str()[tabidx+1:]
+				# Loop over style boxes
+				sbox_idx = -1
+				for i in range(len(self.__sbox__)):
+					# Get the index of the style box that includes tabidx
+					# Increase this style box's length
+					if self.__sbox__[i].contains(tabidx):
+						self.__sbox__[i].length += tabsize - len('\t')
+						sbox_idx = i
+					# Shift the subsequent style boxes start indices
+					if sbox_idx != -1 and i > sbox_idx:
+						self.__sbox__[i].start += tabsize - len('\t')
+		return self
 
 	def ljust(self, width, fillchar=' ', fg=None, bg=None, style=None):
 		"""
@@ -726,6 +766,7 @@ class ConsolePrinter:
 			raise TypeError(error_msg)
 		if sorted(list(color.keys())) != ['bg', 'fg']:
 			raise ValueError(error_msg)
+		# TODO: check color values, should this be moved to a module function?
 
 	def alinea_incr(self):
 		"""
@@ -799,16 +840,32 @@ class ConsolePrinter:
 		self._print_msg(msg, status='failed')
 
 	def set_label_color(self, label_type, color):
+		"""
+		Set color for labels
+		:param label_type: label type, should be one of the valid label types
+		:param color: color to use, specified as a dictionary with 'fg' and 'bg' keys
+		:return: self, modified
+		"""
 		self._validate_label(label_type)
 		self._color_label[label_type] = color
 		return self
 
 	def set_status_color(self, status_type, color):
+		"""
+		Set color for statuses
+		:param status_type: status type, should be one of the valid label types
+		:param color: color to use, specified as a dictionary with 'fg' and 'bg' keys
+		:return: self, modified
+		"""
 		self._validate_status(status_type)
 		self._color_status[status_type] = color
 		return self
 
 	def reset_colors(self):
+		"""
+		Reset label and status colors to default values
+		:return: self, modified
+		"""
 		self._color_label = copy.deepcopy(self._color_label_default)
 		self._color_status = copy.deepcopy(self._color_status_default)
 		return self

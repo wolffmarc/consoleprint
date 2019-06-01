@@ -161,10 +161,13 @@ args_and_answer = [
     [['blue'], [red + ' ', ' ' + green]],
     [['green'], [red + ' ' + blue + ' ', empty]]
 ]
-
-
 tests['splitting'] = list(printreturn(teststr.split(*(x[0]))) == x[1] for x in args_and_answer)
-
+print('****************************************************************')
+print('*** EXPANDTABS TESTS *******************************************')
+print('****************************************************************')
+teststr = RichText('\tred', fg='red') + '\t' + RichText('bl\tue', fg='blue') + '\t' + RichText('green\t', fg='green')
+answer = RichText('   red', fg='red') + '   ' + RichText('bl   ue', fg='blue') + '   ' + RichText('green   ', fg='green')
+tests['expandtabs'] = [printreturn(teststr.expandtabs(3)) == answer]
 
 
 
