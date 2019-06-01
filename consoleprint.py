@@ -26,7 +26,7 @@ def __overlap__(a, b):
 		raise Exception('first input argument is not an interval')
 	if not isinstance(b, list) or len(b) != 2 or b[0] > b[1]:
 		raise Exception('second input argument is not an interval')
-	return sum(1 for x in range(a[0], a[1]+1) if x in range(b[0], b[1]+1))
+	return max(min(a[1], b[1]) - max(a[0], b[0]) + 1, 0)  #sum(1 for x in range(a[0], a[1]+1) if x in range(b[0], b[1]+1))
 
 
 class StyleBox:
