@@ -172,7 +172,7 @@ class RichText:
 			cur = self.__sbox__[i]
 			nxt = self.__sbox__[i+1]
 			# If they have the same style, delete the next one and add its length to the current one
-			if cur.style() == nxt.style():
+			if cur.__style__ == nxt.__style__:
 				cur.length += nxt.length
 				self.__sbox__.remove(nxt)
 				# Don't increase the index in this case
@@ -335,7 +335,25 @@ class RichText:
 			# Update index and number of characters left to remove
 			i -= 1
 			numchars -= to_remove
-		return self	
+		return self
+
+	def __setitem__(self, key, value):
+		if not isinstance(value, str):
+			raise TypeError('expects a string as input')
+		# Transform key into a slice if it is an integer
+		key_slice = key
+		if isinstance(key, int):
+			key_slice = slice(key, key + 1)
+		# Check the step
+		if key_slice.step is not None and key_slice.step != 1:
+			raise NotImplementedError('slices with a step different from 1 are not supported')
+		# Chek
+		start, stop = key_slice.indices(len(self))[0:2]
+		if stop - start != len(value):
+			raise ValueError('length of the input string does not match')
+		# Do the string replacement
+		self.replaceall(self.str()[:start] + value + self.str()[stop:])
+		return self
 
 	def __str__(self):
 		"""
