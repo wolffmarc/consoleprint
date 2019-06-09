@@ -95,6 +95,8 @@ class RichText:
 		bg: background color
 		style: font style (e.g. bold, underline, etc.)
 		"""
+		if isinstance(text, RichText):
+			text = text.str()
 		self.__text__ = text
 		self.__sbox__ = []
 		if len(text) > 0:
@@ -383,7 +385,7 @@ class RichText:
 			self.lower()			
 		return self
 
-	def center(self, width, fillchar=' ', fg=None, bg=None, style=None):
+	def center(self, width, fillchar=' ', fg=None, bg=None, style=None, pushleft=False):
 		"""
 		Extension of the built-in string center() method
 		:param width: width of the output string
@@ -391,6 +393,9 @@ class RichText:
 		:param fg: optional foreground color for fill characters
 		:param bg: optional background color for fill characters
 		:param style: optional font style options for fill characters
+		:param pushleft: indicates if the string should be 'pushed' to the left when there is an odd number of
+			characters to add. By default, the center() method adds more character to the left, which results
+			in a centered string pushed to the right. Setting this flag to True allows to push it to the left
 		:return: self, modified
 		"""
 		# Do a dummy call to the built-in method to validate input arguments
@@ -400,7 +405,7 @@ class RichText:
 			return self
 		# Num characters to add at the left and right ends of the string
 		num_chars_to_add = width - len(self)
-		num_chars_left = int(math.ceil(num_chars_to_add * 0.5))
+		num_chars_left = int(math.floor(num_chars_to_add * 0.5) if pushleft else math.ceil(num_chars_to_add * 0.5))
 		num_chars_right = num_chars_to_add - num_chars_left
 		# Append fill characters to both ends
 		self.__lconcat__(RichText(fillchar * num_chars_left, fg, bg, style))
@@ -435,6 +440,22 @@ class RichText:
 					if sbox_idx != -1 and i > sbox_idx:
 						self.__sbox__[i].start += tabsize - len('\t')
 		return self
+
+	def join(self, iterable):
+		"""
+		Extension of the built-in string join() method
+		:param iterable: iterable object to join
+		:return: RichText object
+		"""
+		# Deal with the edge case where iterable is empty
+		if len(iterable) == 0:
+			return RichText('')
+		# Deal with the normal case
+		separator = copy.deepcopy(self)
+		out = copy.deepcopy(iterable[0])
+		for i in range(1, len(iterable)):
+			out += separator + copy.deepcopy(iterable[i])
+		return out
 
 	def ljust(self, width, fillchar=' ', fg=None, bg=None, style=None):
 		"""

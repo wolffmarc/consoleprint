@@ -2,6 +2,11 @@ from Histogram import *
 import random
 import string
 
+
+pnb = PositiveNegativeBars(height=15, ymax=5, ymin=-10)
+pnb.plot(list(range(-10,6)), ticks='all')
+
+
 sb = StackedBars(height=20)
 sb.plot([{'A': 5, 'B': 12}, {'A': 7, 'C':15}, {'B': 36}, {'C': 4, 'D': 87}], ticks='all')
 
@@ -9,11 +14,15 @@ sb.plot([{'A': 5, 'B': 12}, {'A': 7, 'C':15}, {'B': 36}, {'C': 4, 'D': 87}], tic
 # Single color bar plot
 num_values = random.randint(20, 26)
 val = [random.randint(0, 1000) for x in range(num_values)]
-legend = []
-for i in range(num_values):
-    legend.append(random.randint(10, 100) * string.ascii_lowercase[i])
 h = Bars(height=20, showvalues=True, spacing=1, thickness=7)
-h.plot(val, ticks='auto',  legend=None)
+labels = [string.ascii_uppercase[i] for i in range(num_values)]
+h.plot(val, labels=labels, ticks='auto',  legend=None)
+h = Bars(height=20, showvalues=True, spacing=3, thickness=7)
+h.plot(val, labels=['Segment ' + x for x in labels], ticks='auto',  legend=None)
+h.plot(val, labels=['I am in segment ' + x for x in labels], ticks='auto',  legend=None)
+h = Bars(height=20, showvalues=True, spacing=3, thickness=9)
+h.plot(val, labels=['I am in segment ' + x for x in labels], ticks='auto',  legend=None)
+
 
 
 # Bar plot with multiple color levels
@@ -30,8 +39,6 @@ bars.plot(data, ticks='auto', numticks=5)
 bars.plot(data, ticks='all')
 bars = Bars(height=12, color=colorfun, spacing=1, thickness=3, showvalues=True, ymax=120)
 bars.plot(data, ticks='all')
-
-
 
 # Stacked bars plot
 bu_names = ['Agos', 'Sofinco', 'Creditplus', 'CACF NL', 'Credibom', 'Wafasalaf', 'GAC', 'CACF Bankia']
@@ -56,3 +63,5 @@ sb = PercentageStackedBars(height=20, spacing=1, thickness=3)
 sb.plot(data, legendpos='top', title='Percentage stacked bars with legend above the figure'.title())
 sb.plot(data, legendpos='right', title='Percentage stacked bars with legend on the right'.title())
 sb.plot(data, legendpos='bottom', title='Percentage stacked bars with legend below the figure'.title())
+
+print(RichText(' ', bg='blue') + ' ' + RichText(' ', fg='blue', style='bold+underline'))

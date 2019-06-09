@@ -4,43 +4,33 @@ import copy
 import math
 
 # TODO LIST
-# TODO add join method to RichText
 # TODO add option for displaying labels beneath bars
 # TODO add input data checks
 
 
-def _center(string, start, stop, fillchar=' '):
-    if len(string) > stop - start:
-        return fillchar * (stop - start)
-    num_spaces = stop - start - len(string)
-    num_spaces_left = int(math.floor(num_spaces * 0.5))
-    num_spaces_right = num_spaces - num_spaces_left
-    return fillchar * num_spaces_left + string + fillchar * num_spaces_right
-
-
-def get_tick_indices(tickmode, numticks, ycoords):
+def get_tick_indices(tickmode, numticks, coords):
     """
-    Ticks on the y axis are a subset of the y coordinates
+    Ticks on the axis are a subset of the axis coordinates
     This function returns the indices of y coordinates on which a tick should be displayed
     :param tickmode: should be 'auto' (automatically generated) or 'all'
     :param numticks: minimum number of ticks to display, only applies to 'auto' mode
-    :param ycoords: y coordinates
+    :param coords: list of coordinates along the axis
     :return indices: ticks indices in the input list of y coordinates
     :return numchar: maximum number of characters required to display ticks, this is useful to preserve alignments
     """
-    if tickmode == 'all' or (tickmode == 'auto' and numticks >= len(ycoords)):
+    if tickmode == 'all' or (tickmode == 'auto' and numticks >= len(coords)):
         # Put a tick in front of each row
-        indices = list(range(len(ycoords)))
+        indices = list(range(len(coords)))
     else:
         # It tickmode is 'auto', put at least 'numticks' ticks
         tick_spacing = 5  # default spacing between ticks
         # Decrease the tick spacing progressively until we get the desired number of ticks
         indices = []
         while len(indices) < numticks:
-            indices = list(range(tick_spacing-1, len(ycoords), tick_spacing))
+            indices = list(range(0, len(coords), tick_spacing))
             tick_spacing -= 1
     # Compute the number of characters required to display ticks
-    numchar = max(len(str(NiceNumber(ycoords[i]))) for i in indices)
+    numchar = max(len(str(NiceNumber(coords[i]))) for i in indices)
     return indices, numchar
 
 
@@ -100,11 +90,7 @@ class ChartBox:
         self._strings[key] = value
 
     def __str__(self):
-        out = ''
-        for s in self._strings:
-            out += s + '\n'
-        out = out[:-1]  # remove the last \n character
-        return str(out)
+        return str(RichText('\n').join(self._strings))
 
     def laddblank(self, num):
         """
@@ -258,11 +244,7 @@ class ChartBox:
         return len(self._strings) == 0 or self.width() == 0
 
     def join(self, joinchar):
-        new_string = RichText('')
-        for s in self._strings:
-            new_string += s + joinchar
-        new_string = new_string[:-len(joinchar)]
-        self._strings = [new_string]
+        self._strings = [joinchar.join(self._strings)]
         return self
 
     def reverse(self):
@@ -303,10 +285,10 @@ class GenericChart(ABC):
     def yaxis(self, data, ticks, numticks):
         pass
 
-    def plot(self, data, legend=None, legendpos='right', numticks=5, ticks='auto', title=None):
+    def plot(self, data, labels=None, legend=None, legendpos='right', numticks=5, ticks='auto', title=None):
         """
-
-        The chart is composed on the following boxes:
+        The most generic plotting function
+        It relies on the assumption that the  chart is composed on the following boxes:
         [                       FIGURE TITLE                        ]
         [             LEGEND if positioned on the top               ]
         [--------------][-------------------------][----------------]
@@ -321,13 +303,16 @@ class GenericChart(ABC):
         yaxis = self.yaxis(data, ticks, numticks)
         figurebox = self.figurebox(data)
         legendbox = self.legendbox(legend, legendpos)
-        footer = []  # self.figure_footer()
+        figurefooterbox = self.figurefooterbox(data, labels)
+        # Concatenate the figure footer inside the figure box,
+        # then add the missing extra blank rows to the y axis
+        hasfooter = not figurefooterbox.isempty()
+        figurebox_size = len(figurebox)
+        if hasfooter:
+            figurebox.tconcat(figurefooterbox.reverse())
+        yaxis.taddblank(len(figurebox) - figurebox_size)
         # Concanate the y axis inside the figure box, then reverse the figure box
         figurebox.lconcat(yaxis).reverse()
-        # Concatenate the figure footer inside the figure box
-        hasfooter = len(footer) > 0
-        if hasfooter:
-            exit()
         # If the legend is on the right:
         # - add a few blank characters to separate it from the figure
         # - center the figure and legend boxes vertically
@@ -377,20 +362,6 @@ class Bars(GenericChart):
         self._thickness = thickness
         self._ymax = ymax
 
-    def _barlabels(self):
-        """
-        Generate labels that will be put beneath bars to designate them
-        :return:
-        """
-
-    def _legend(self, labels):
-        """
-        The standard bar chart does not have a need for legends
-        :param labels:
-        :return: ChartBox object representing the figure, ordered from x=0 to x=max(data)
-        """
-        return
-
     def figurebox(self, data):
         """
         :param data:
@@ -402,22 +373,27 @@ class Bars(GenericChart):
         width = num_bars * self._thickness + (num_bars + 1) * self._spacing
         # Build the figure box and initialize it with the x axis
         figure_box = ChartBox()
-        figure_box.append([RichText('-' * width, style='bold')])
         # Draw the figure
-        for j in range(self._height):
-            y = ycoords[j] - 0.5 * dy  # subtract 0.5 * dy to take the middle of the cell into account for coloring
-            s = RichText(' ' * self._spacing)  # add the first spacing
-            for i in range(num_bars):
-                color = _getcolor(self._color, i, y)
-                if y <= data[i]:
-                    s += RichText(' ' * self._thickness, bg=color)
-                elif j == 0:
-                    # On the first row, add underlining to materialize the bar
-                    s += RichText(' ' * self._thickness, fg=color, style='underline')
-                else:
-                    s += ' ' * self._thickness
-                s += ' ' * self._spacing
-            figure_box.append(s.__clean_style_boxes__())
+        for j in range(len(ycoords)):
+            if ycoords[j] == 0:
+                figure_box.append([RichText('-' * width, style='bold')])
+            else:
+                ysign = 1 if ycoords[j] >= 0 else -1
+                # For coloring, we take the middle of the cell into account
+                # --> subtract 0.5 * dy for positive y and add 0.5 * dy for negative y
+                y = ycoords[j] - 0.5 * ysign * dy
+                s = RichText(' ' * self._spacing)  # add the first spacing
+                for i in range(num_bars):
+                    color = _getcolor(self._color, i, y)
+                    if 0 <= y <= data[i] or 0 >= y >= data[i]:
+                        s += RichText(' ' * self._thickness, bg=color)
+                    elif ycoords[j] == dy and 0 <= data[i] <= y:
+                        # On the first row, add underlining to materialize the bar
+                        s += RichText(' ' * self._thickness, fg=color, style='underline')
+                    else:
+                        s += ' ' * self._thickness
+                    s += ' ' * self._spacing
+                figure_box.append(s.__clean_style_boxes__())
         # Add bar values
         if self._showvalues:
             # Add an extra line to the figure box
@@ -429,15 +405,63 @@ class Bars(GenericChart):
             for i in range(num_bars):
                 # Get the height index of the string where the label should be put
                 j = ([y - 0.5 * dy > data[i] for y in ycoords] + [True]).index(True)
-                # Center the label string in the middle of the bar
-                valuestr = _center(str(NiceNumber(data[i])), bar_start[i], bar_stop[i])
+                # Center the value string in the middle of the bar
+                valuestr = RichText(str(NiceNumber(data[i]))).center(bar_stop[i] - bar_start[i], pushleft=True)
                 color = _getcolor(self._color, i, ycoords[max(j-1, 0)] - 0.5 * dy)
-                if j == 0:
+                if j == 1:
                     valuestr = RichText(valuestr, fg=color, style='bold+underline')
                 else:
                     valuestr = RichText(valuestr, fg=color, style='bold')
-                figure_box[j + 1] = figure_box[j + 1][0:bar_start[i]] + valuestr + figure_box[j + 1][bar_stop[i]:]
+                figure_box[j] = figure_box[j][0:bar_start[i]] + valuestr + figure_box[j][bar_stop[i]:]
         return figure_box
+
+    def figurefooterbox(self, data, labels):
+        """
+        Creates a figure footer cbart box to put input labels beneath the figure's bars
+        :param labels: list of strings
+        :return: ChartBox object
+        """
+        if labels is None:
+            return ChartBox()
+        # Build a single string containing input labels at the right positions
+        footer_str = [RichText('')]
+        num_bars = len(data)
+        # TODO Check input labels
+        # Add labels
+        for i in range(num_bars):
+            current_label = labels[i]
+            # Start and stop indices of the current bar
+            start = self._spacing + i * (self._thickness + self._spacing)
+            stop = start + self._thickness
+            if len(current_label) > stop - start:
+                # If the label is too long, try splitting it first
+                current_label = current_label.split(' ')
+                # If it is still to long, skip this label
+                if max(len(s) for s in current_label) > stop - start:
+                    continue
+                # Try to bring some pieces together
+                idx = 0
+                while idx < len(current_label) - 1:
+                    merged_labels = ' '.join(current_label[idx:idx+2])
+                    if len(merged_labels) <= stop - start:
+                        current_label[idx] = merged_labels
+                        del current_label[idx+1]
+                    else:
+                        idx += 1
+            else:
+                # Otherwise put the label in a list with a single element
+                # This is just to have the same data structure as when the label does not fit
+                current_label = [current_label]
+            # Add the parts of the label to the footer string
+            for j in range(len(current_label)):
+                if j >= len(footer_str):
+                    footer_str.append(RichText(''))
+                footer_str[j].ljust(start)
+                footer_str[j] += RichText(current_label[j], style='bold').center(stop - start, pushleft=True)
+        # Create the output object
+        figure_footer_box = ChartBox()
+        figure_footer_box.append(footer_str)
+        return figure_footer_box
 
     def legendbox(self, labels, legendpos):
         """
@@ -458,6 +482,8 @@ class Bars(GenericChart):
         """
         # Compute y coordinates
         ycoords, _ = self.ycoordinates(data)
+        has_pos_coords = sum(1 for y in ycoords if y > 0) > 0
+        has_neg_coords = sum(1 for y in ycoords if y < 0) > 0
         # Compute ticks
         if ticks is not None:
             tick_indices, numchar = get_tick_indices(ticks, numticks, ycoords)
@@ -465,12 +491,11 @@ class Bars(GenericChart):
             tick_indices = []
             numchar = 0
         # Create the y axis
-        # Add the margin for the x axis which is located in the first cell of the yaxis list
         yaxis = ChartBox()
-        yaxis.append(RichText(' ' * (numchar-1) + '0|', style='bold'))
-        # Build the rest of the y axis
         # TODO add comment to explain why we use height + showvalues below
-        for j in range(self._height + int(self._showvalues)):
+        num_extra_rows = int(self._showvalues) * (int(has_pos_coords) + int(has_neg_coords))
+        axis_size = len(ycoords) + num_extra_rows
+        for j in range(axis_size):
             s = ''
             if ticks is not None:
                 if j in tick_indices:
@@ -480,7 +505,8 @@ class Bars(GenericChart):
                     # No tick on current line --> add extra spaces to keep alignment
                     s += numchar * ' '
             # Add the y axis marker
-            s += '|' if j < self._height else ' '
+            no_axis_marker = self._showvalues and ((j == 0 and has_neg_coords) or (j == axis_size - 1 and has_pos_coords))
+            s += '|' if not no_axis_marker else ' '
             yaxis.append(RichText(s, style='bold'))
         return yaxis
 
@@ -498,7 +524,7 @@ class Bars(GenericChart):
         # Compute the spacing along the y axis
         dy = ymax / (self._height * 1.0)
         # Compute the y coordinates
-        ycoords = [i * dy for i in range(1, self._height + 1)]
+        ycoords = [i * dy for i in range(self._height + 1)]
         # Enforce the max value as last element to prevent round off errors
         ycoords[-1] = ymax
         return ycoords, dy
@@ -607,3 +633,55 @@ class PercentageStackedBars(StackedBars):
         super(StackedBars, self).plot(
             [100] * len(data),  # with stacked bars, we only plot bars of size 100
             legend=categories, legendpos=legendpos, numticks=numticks, ticks=ticks, title=title)
+
+
+class PositiveNegativeBars(Bars):
+
+    def __init__(self, color=lambda index, y: 'red' if y < 0 else 'green', height=20, showvalues=False, spacing=2,
+                 thickness=5, ymax=None, ymin=None):
+        super(PositiveNegativeBars, self).__init__(
+            height=height, color=color, showvalues=showvalues, spacing=spacing, thickness=thickness, ymax=ymax)
+        self._ymin = ymin
+
+
+
+    def legendbox(self, labels, legendpos):
+        """
+        Positive negative bar charts do not support legends --> return an empty chart box
+        :param labels:
+        :param legendpos:
+        :return:
+        """
+        return ChartBox()
+
+
+    def ycoordinates(self, data):
+        """
+        Compute y coordinates
+        :param data: list of numeric values to plot
+        :return ycoords: list of y coordinates in ascending order
+        :return dy: spacing along the y axis
+        """
+        # Get min and max y values
+        ymax = max(data) if self._ymax is None else max(max(data), self._ymax)
+        ymin = min(data) if self._ymin is None else min(min(data), self._ymin)
+        # Compute the spacing along the y axis
+        maxbound = max(ymax, abs(ymin))
+        minbound = min(ymax, abs(ymin))
+        dy = maxbound / round(maxbound / (ymax - ymin) * self._height)
+        # Number of cells on the plus and minus sides
+        pnumcells = round(maxbound / (ymax - ymin) * self._height)
+        mnumcells = math.ceil(minbound / dy)
+        if maxbound == abs(ymin):
+            pnumcells, mnumcells = mnumcells, pnumcells
+        # Compute y coordinates
+        ycoords = [-i * dy for i in range(mnumcells, 0, -1)] + [i * dy for i in range(1, pnumcells + 1)]
+        # Adjust height
+        self._height = len(ycoords)
+        # Compute the y coordinates
+        # Enforce the min and max values as last element to prevent round off errors
+        if maxbound == abs(ymin):
+            ycoords[0] = ymin
+        if maxbound == ymax:
+            ycoords[-1] = ymax
+        return ycoords, dy
